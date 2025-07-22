@@ -54,12 +54,28 @@ jobs:
         distribution: 'temurin'
     - name: Build application
       run: mvn clean package
-    - name: Deploy to Test
-      run: |
-        echo "Deploying to TEST environment"
-        echo "DB_URL=jdbc:postgresql://${{ secrets.TEST_DB_HOST }}:5432/webapp" > .env
-        echo "DB_USERNAME=${{ secrets.DB_USERNAME }}" >> .env
-        echo "DB_PASSWORD=${{ secrets.DB_PASSWORD }}" >> .env
+    - name: Deploy to Test Host
+      uses: appleboy/ssh-action@v0.1.5
+      with:
+        host: ${{ secrets.BASTION_HOST }}
+        username: ec2-user
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        script: |
+          sudo yum update -y
+          sudo yum install -y java-11-openjdk
+          mkdir -p /home/ec2-user/app
+          export DB_URL=jdbc:postgresql://${{ secrets.TEST_DB_HOST }}:5432/webapp
+          export DB_USERNAME=${{ secrets.DB_USERNAME }}
+          export DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          echo "Application deployed to test"
+    - name: Upload JAR
+      uses: appleboy/scp-action@v0.1.4
+      with:
+        host: ${{ secrets.BASTION_HOST }}
+        username: ec2-user
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        source: "target/*.jar"
+        target: "/home/ec2-user/app/"
 
   deploy-staging:
     needs: test
